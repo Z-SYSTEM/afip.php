@@ -8,8 +8,6 @@
  *
  * @link http://www.afip.gob.ar/ws/ AFIP Web Services documentation
  *
- * @author 	Afip SDK afipsdk@gmail.com
- * @package Afip
  * @version 0.6
  **/
 
@@ -289,8 +287,6 @@ class Afip {
  *
  * @since 0.1
  *
- * @package Afip
- * @author 	Afip SDK afipsdk@gmail.com
  **/
 class TokenAuthorization {
 	/**
@@ -319,8 +315,6 @@ class TokenAuthorization {
  *
  * @since 0.6
  *
- * @package Afip
- * @author 	Afip SDK afipsdk@gmail.com
 **/
 class AfipWebService
 {
