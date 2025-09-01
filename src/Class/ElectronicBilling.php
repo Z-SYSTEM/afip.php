@@ -80,6 +80,10 @@ class ElectronicBilling extends AfipWebService {
 		unset($data['PtoVta']);
 		unset($data['CbteTipo']);
 
+		// DEBUG: Verificar que CondicionIVAReceptorId esté presente
+		error_log("CAMPO CondicionIVAReceptorId: " . (isset($data['CondicionIVAReceptorId']) ? $data['CondicionIVAReceptorId'] : 'NO EXISTE'));
+		error_log("DATOS FINALES: " . print_r($data, true));
+
 		if (isset($data['Tributos'])) 
 			$data['Tributos'] = array('Tributo' => $data['Tributos']);
 
@@ -89,6 +93,8 @@ class ElectronicBilling extends AfipWebService {
 		if (isset($data['Opcionales'])) 
 			$data['Opcionales'] = array('Opcional' => $data['Opcionales']);
 
+		// DEBUG: Ver estructura completa del request
+		error_log("REQUEST COMPLETO A AFIP: " . print_r($req, true));
 		$results = $this->ExecuteRequest('FECAESolicitar', $req);
 
 		if ($return_response === TRUE) {
