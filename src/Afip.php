@@ -459,6 +459,19 @@ class AfipWebService
 
 		$results = $this->soap_client->{$operation}($params);
 
+		// // LOG REQUEST DETAILS
+		// $requestHeaders = $this->soap_client->__getLastRequestHeaders();
+		// $requestBody    = $this->soap_client->__getLastRequest();
+		// $requestUrl     = $this->URL;
+		// $requestMethod  = 'POST'; // SOAP siempre usa POST
+
+		// // Puedes usar cualquier logger, aquí ejemplo simple a archivo:
+		// file_put_contents(
+		// 	__DIR__ . '/afip_requests.log',
+		// 	"-----\nMETHOD: $requestMethod\nURL: $requestUrl\nHEADERS:\n$requestHeaders\nBODY:\n$requestBody\n",
+		// 	FILE_APPEND
+		// );
+
 		$this->_CheckErrors($operation, $results);
 
 		return $results;
