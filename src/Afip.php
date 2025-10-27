@@ -133,7 +133,7 @@ class Afip {
 		$this->PRIVATEKEY 	= $this->RES_FOLDER.$options['key'];
 
 		$this->WSAA_WSDL 	= __DIR__.'/Afip_res/'.'wsaa.wsdl';
-		if ($options['production'] === TRUE) {
+		if ($options['production']) {
 			$this->WSAA_URL = 'https://wsaa.afip.gov.ar/ws/services/LoginCms';
 		} else {
 			$this->WSAA_URL = 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms';
