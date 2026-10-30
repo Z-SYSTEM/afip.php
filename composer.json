@@ -6,7 +6,9 @@
     "homepage": "https://github.com/z-system/afip.php",
     "license": "MIT",
     "require": {
-        "php": ">=5.3.3"
+        "php": ">=7.4",
+        "ext-soap": "*",
+        "ext-openssl": "*"
     },
     "authors": [
         {

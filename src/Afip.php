@@ -11,6 +11,7 @@
  * @version 0.6
  **/
 
+#[AllowDynamicProperties]
 class Afip {
 	/**
 	 * File name for the WSDL corresponding to WSAA
@@ -81,6 +82,24 @@ class Afip {
 		'RegisterScopeTen',
 		'RegisterScopeThirteen'
 	);
+
+	/**
+	 * Contexto TLS para las llamadas SOAP a ARCA (valida el certificado del servidor).
+	 *
+	 * @return resource
+	 **/
+	public function SslContext()
+	{
+		$verify = !isset($this->options['verify_ssl']) || $this->options['verify_ssl'] !== FALSE;
+		$ssl = array('verify_peer' => $verify, 'verify_peer_name' => $verify);
+		if (!empty($this->options['cafile'])) {
+			$ssl['cafile'] = $this->options['cafile'];
+		}
+		if (!empty($this->options['ssl_ciphers'])) {
+			$ssl['ciphers'] = $this->options['ssl_ciphers'];
+		}
+		return stream_context_create(array('ssl' => $ssl));
+	}
 
 	function __construct($options)
 	{
@@ -228,7 +247,7 @@ class Afip {
 			'location'       => $this->WSAA_URL,
 			'trace'          => 1,
 			'exceptions'     => $this->options['exceptions'],
-			'stream_context' => stream_context_create(['ssl'=> ['ciphers'=> 'AES256-SHA','verify_peer'=> false,'verify_peer_name'=> false]])
+			'stream_context' => $this->SslContext()
 		)); 
 		$results=$client->loginCms(array('in0'=>$CMS));
 		if (is_soap_fault($results)) 
@@ -316,6 +335,7 @@ class TokenAuthorization {
  * @since 0.6
  *
 **/
+#[AllowDynamicProperties]
 class AfipWebService
 {
 	/**
@@ -453,7 +473,7 @@ class AfipWebService
 				'location'       => $this->URL,
 				'trace'          => 1,
 				'exceptions'     => $this->afip->options['exceptions'],
-				'stream_context' => stream_context_create(['ssl'=> ['ciphers'=> 'AES256-SHA','verify_peer'=> false,'verify_peer_name'=> false]])
+				'stream_context' => $this->afip->SslContext()
 			));
 		}
 

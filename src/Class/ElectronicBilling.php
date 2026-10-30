@@ -9,6 +9,7 @@
  * @version 0.7
  **/
 
+#[AllowDynamicProperties]
 class ElectronicBilling extends AfipWebService {
 
 	var $soap_version 	= SOAP_1_2;
