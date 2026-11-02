@@ -1,36 +1,78 @@
 # AFIP PHP SDK
 
-Este proyecto es un Software Development Kit (SDK) en PHP para facilitar la integración con los servicios web de la AFIP (Administración Federal de Ingresos Públicos) de Argentina.
+SDK en PHP para Web Services SOAP de ARCA (Argentina): facturación electrónica (wsfev1), padrón contribuyentes y WSAA.
+
+**Integradores y agentes de IA:** leer **[AGENTS.md](AGENTS.md)** — mapa de clases, opciones del constructor, formas de `$data`, servicios WSAA y flujos listos para copiar en otros proyectos.
 
 ## Estructura del proyecto
-- `src/` - Código fuente principal del SDK.
-- `src/Afip_res/` - Recursos necesarios como certificados, claves y archivos WSDL.
-- `src/Class/` - Clases para los distintos servicios web implementados.
-- `examples/` - Ejemplos de uso del SDK.
+
+| Ruta | Contenido |
+|------|-----------|
+| `src/Afip.php` | Clase principal, WSAA, `AfipWebService` |
+| `src/Class/` | `ElectronicBilling`, `RegisterScope*` |
+| `src/Afip_res/` | Certificados, claves, WSDL, cache TA |
+| `examples/` | Scripts ejecutables de referencia |
+| `AGENTS.md` | Documentación orientada a IA y apps consumidoras |
 
 ## Requisitos
-- PHP 5.6 o superior
-- Extensión SOAP habilitada
-- OpenSSL habilitado
+
+- PHP 7.4+
+- Extensión `soap`
+- Extensión `openssl`
+- Certificado y clave AFIP; cada WS debe estar **autorizado** para ese certificado
 
 ## Instalación
-1. Clona este repositorio o descarga los archivos.
-2. Configura los certificados y claves en `src/Afip_res/`.
-3. Ajusta los parámetros necesarios en tu integración.
 
-## Ejemplo de uso
-Consulta el archivo `examples/CreateVoucher.php` para ver cómo utilizar el SDK para emitir un comprobante electrónico.
+**Composer (recomendado en otros proyectos):**
+
+```bash
+composer require z-system/afip.php
+```
+
+```php
+require 'vendor/autoload.php';
+$afip = new Afip(['CUIT' => 20123456789]);
+```
+
+**Clonar y certificados:** colocar `cert` y `key` (PEM) en `src/Afip_res/` o indicar `res_folder` / `ta_folder` en el constructor (ver AGENTS.md).
+
+## Ejemplos
+
+| Archivo | Descripción |
+|---------|-------------|
+| [examples/CreateVoucher.php](examples/CreateVoucher.php) | CAE, un comprobante (`CondicionIVAReceptorId`) |
+| [examples/CreateVoucherBatch.php](examples/CreateVoucherBatch.php) | CAE en lote |
+| [examples/Caea.php](examples/Caea.php) | CAEA: consultas (+ código comentado) |
+| [examples/Padron.php](examples/Padron.php) | Padrón A13 por CUIT |
+
+## Servicios disponibles
+
+Acceso: `$afip->ElectronicBilling`, `$afip->RegisterScopeThirteen`, etc.
+
+### Facturación — `ElectronicBilling` (WSAA: `wsfe`)
+
+| Grupo | Métodos |
+|-------|---------|
+| CAE | `CreateVoucher`, `CreateNextVoucher`, `GetLastVoucher`, `GetVoucherInfo` |
+| CAEA | `RequestCaea`, `QueryCaea`, `InformCaeaNoMovement`, `QueryCaeaNoMovement`, `RegisterCaeaInformativo` |
+| Parámetros | `GetVoucherTypes`, `GetConceptTypes`, `GetDocumentTypes`, `GetAliquotTypes`, `GetCurrenciesTypes`, `GetOptionsTypes`, `GetTaxTypes`, `GetSalesPoints`, `GetCurrencyQuotation`, `GetReceiverVatConditions`, `GetCountryTypes`, `GetActivityTypes`, `GetMaxRegistrationsPerRequest` |
+| Otros | `GetServerStatus`, `FormatDate` |
+
+Lote: `PtoVta`, `CbteTipo`, `comprobantes` => array de detalles. Manual: [homologación wsfev1](https://www.afip.gov.ar/ws/documentacion/homologacion-externa.asp).
+
+### Padrón — WSAA por clase
+
+| Clase | WSAA | Métodos principales |
+|-------|------|---------------------|
+| `RegisterScopeFour` | `ws_sr_padron_a4` | `GetTaxpayerDetails` |
+| `RegisterScopeFive` / `RegisterInscriptionProof` | `ws_sr_padron_a5` | `GetTaxpayerDetails`, `GetTaxpayersDetails` |
+| `RegisterScopeTen` | `ws_sr_padron_a10` | `GetTaxpayerDetails` |
+| `RegisterScopeThirteen` | `ws_sr_padron_a13` | `GetTaxpayerDetails`, `GetTaxIDByDocument` |
+
+## Seguridad TLS
+
+Por defecto se valida el certificado del servidor ARCA. Opciones en el constructor: `cafile`, `ssl_ciphers`, `verify_ssl` (ver AGENTS.md).
 
 ## Licencia
-Ver archivo `LICENSE`.
 
-
-## Seguridad TLS (desde 0.8)
-
-Por defecto se **valida el certificado** del servidor de ARCA (antes estaba desactivado). Opciones nuevas:
-
-- `cafile`: ruta al bundle de CA (si no se indica, se usa el del sistema / `openssl.cafile` de PHP).
-- `ssl_ciphers`: fuerza una lista de cifrados, solo si un servidor lo exige (ej. `DEFAULT@SECLEVEL=1`).
-- `verify_ssl`: `FALSE` desactiva la validacion. Solo para pruebas; no usar en produccion.
-
-Requiere PHP 7.4 o superior con las extensiones `soap` y `openssl`.
+MIT — ver [LICENSE](LICENSE).

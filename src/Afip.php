@@ -94,6 +94,13 @@ class Afip {
 		$ssl = array('verify_peer' => $verify, 'verify_peer_name' => $verify);
 		if (!empty($this->options['cafile'])) {
 			$ssl['cafile'] = $this->options['cafile'];
+		} elseif ($verify) {
+			foreach (array(ini_get('openssl.cafile'), ini_get('curl.cainfo')) as $bundle) {
+				if ($bundle !== '' && is_readable($bundle)) {
+					$ssl['cafile'] = $bundle;
+					break;
+				}
+			}
 		}
 		if (!empty($this->options['ssl_ciphers'])) {
 			$ssl['ciphers'] = $this->options['ssl_ciphers'];
@@ -114,6 +121,8 @@ class Afip {
 
 		if (!isset($options['production'])) {
 			$options['production'] = FALSE;
+		} else {
+			$options['production'] = filter_var($options['production'], FILTER_VALIDATE_BOOLEAN);
 		}
 
 		if (!isset($options['passphrase'])) {
@@ -179,8 +188,11 @@ class Afip {
 	**/
 	public function GetServiceTA($service, $continue = TRUE)
 	{
-		if (file_exists($this->TA_FOLDER.'TA-'.$this->options['CUIT'].'-'.$service.($this->options['production'] === TRUE ? '-production' : '').'.xml')) {
-			$TA = new SimpleXMLElement(file_get_contents($this->TA_FOLDER.'TA-'.$this->options['CUIT'].'-'.$service.($this->options['production'] === TRUE ? '-production' : '').'.xml'));
+		$ta_suffix = $this->options['production'] ? '-production' : '';
+		$ta_file = $this->TA_FOLDER.'TA-'.$this->options['CUIT'].'-'.$service.$ta_suffix.'.xml';
+
+		if (file_exists($ta_file)) {
+			$TA = new SimpleXMLElement(file_get_contents($ta_file));
 
 			$actual_time 		= new DateTime(date('c',date('U')+600));
 			$expiration_time 	= new DateTime($TA->header->expirationTime);
@@ -193,6 +205,8 @@ class Afip {
 
 		if ($this->CreateServiceTA($service)) 
 			return $this->GetServiceTA($service, FALSE);
+
+		throw new Exception('Error Getting TA', 5);
 	}
 
 	/**
@@ -414,7 +428,7 @@ class AfipWebService
 				throw new Exception("service field is required in options");
 			}
 
-			if ($this->afip->options['production'] === TRUE) {
+			if ($this->afip->options['production']) {
 				$this->WSDL = $options['WSDL'];
 				$this->URL 	= $options['URL'];
 			} else {
@@ -429,7 +443,7 @@ class AfipWebService
 			$this->soap_version = $options['soap_version'];
 		}
 		else {
-			if ($this->afip->options['production'] === TRUE) {
+			if ($this->afip->options['production']) {
 				$this->WSDL = __DIR__.'/Afip_res/'.$this->WSDL;
 			} else {
 				$this->WSDL = __DIR__.'/Afip_res/'.$this->WSDL_TEST;

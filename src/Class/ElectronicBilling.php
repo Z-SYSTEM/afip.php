@@ -6,7 +6,7 @@
  *
  * @author 	Afip SDK
  * @package Afip
- * @version 0.7
+ * @version 0.8
  **/
 
 #[AllowDynamicProperties]
@@ -64,49 +64,162 @@ class ElectronicBilling extends AfipWebService {
 	**/
 	public function CreateVoucher($data, $return_response = FALSE)
 	{
-		$req = array(
-			'FeCAEReq' => array(
-				'FeCabReq' => array(
-					'CantReg' 	=> $data['CbteHasta']-$data['CbteDesde']+1,
-					'PtoVta' 	=> $data['PtoVta'],
-					'CbteTipo' 	=> $data['CbteTipo']
+		if (isset($data['comprobantes']) && is_array($data['comprobantes'])) {
+			$pto_vta   = $data['PtoVta'];
+			$cbte_tipo = $data['CbteTipo'];
+			$detalles  = array();
+
+			foreach ($data['comprobantes'] as $row) {
+				if (!isset($row['PtoVta'])) {
+					$row['PtoVta'] = $pto_vta;
+				}
+				if (!isset($row['CbteTipo'])) {
+					$row['CbteTipo'] = $cbte_tipo;
+				}
+				$detalles[] = $this->FormatVoucherDetail($row);
+			}
+
+			$req = array(
+				'FeCAEReq' => array(
+					'FeCabReq' => array(
+						'CantReg' 	=> count($detalles),
+						'PtoVta' 	=> $pto_vta,
+						'CbteTipo' 	=> $cbte_tipo,
 					),
-				'FeDetReq' => array( 
-					'FECAEDetRequest' => &$data
-				)
-			)
-		);
+					'FeDetReq' => array(
+						'FECAEDetRequest' => count($detalles) === 1 ? $detalles[0] : $detalles,
+					),
+				),
+			);
+		} else {
+			$req = array(
+				'FeCAEReq' => array(
+					'FeCabReq' => array(
+						'CantReg' 	=> $data['CbteHasta'] - $data['CbteDesde'] + 1,
+						'PtoVta' 	=> $data['PtoVta'],
+						'CbteTipo' 	=> $data['CbteTipo'],
+					),
+					'FeDetReq' => array(
+						'FECAEDetRequest' => $this->FormatVoucherDetail($data),
+					),
+				),
+			);
+		}
 
-		unset($data['CantReg']);
-		unset($data['PtoVta']);
-		unset($data['CbteTipo']);
-
-		// DEBUG: Verificar que CondicionIVAReceptorId esté presente
-		// dd("CAMPO CondicionIVAReceptorId: " . (isset($data['CondicionIVAReceptorId']) ? $data['CondicionIVAReceptorId'] : 'NO EXISTE'));
-		// dd("DATOS FINALES: " . print_r($data, true));
-
-		if (isset($data['Tributos'])) 
-			$data['Tributos'] = array('Tributo' => $data['Tributos']);
-
-		if (isset($data['Iva'])) 
-			$data['Iva'] = array('AlicIva' => $data['Iva']);
-
-		if (isset($data['Opcionales'])) 
-			$data['Opcionales'] = array('Opcional' => $data['Opcionales']);
-
-		// DEBUG: Ver estructura completa del request
-		// dd("REQUEST COMPLETO A AFIP: " . print_r($req, true));
 		$results = $this->ExecuteRequest('FECAESolicitar', $req);
+
+		return $this->ParseCaeVoucherResponse($results, $return_response);
+	}
+
+	/**
+	 * Informa comprobantes emitidos bajo régimen CAEA {@see WS Specification}
+	 *
+	 * Misma forma que CreateVoucher; cada detalle debe incluir el campo CAEA.
+	 * También admite clave comprobantes para envío en lote.
+	 *
+	 * @param array $data
+	 * @param bool  $return_response
+	 *
+	 * @return array|object
+	 **/
+	public function RegisterCaeaInformativo($data, $return_response = FALSE)
+	{
+		if (isset($data['comprobantes']) && is_array($data['comprobantes'])) {
+			$pto_vta   = $data['PtoVta'];
+			$cbte_tipo = $data['CbteTipo'];
+			$detalles  = array();
+
+			foreach ($data['comprobantes'] as $row) {
+				if (!isset($row['PtoVta'])) {
+					$row['PtoVta'] = $pto_vta;
+				}
+				if (!isset($row['CbteTipo'])) {
+					$row['CbteTipo'] = $cbte_tipo;
+				}
+				$detalles[] = $this->FormatVoucherDetail($row);
+			}
+
+			$req = array(
+				'FeCAEARegInfReq' => array(
+					'FeCabReq' => array(
+						'CantReg' 	=> count($detalles),
+						'PtoVta' 	=> $pto_vta,
+						'CbteTipo' 	=> $cbte_tipo,
+					),
+					'FeDetReq' => array(
+						'FECAEADetRequest' => count($detalles) === 1 ? $detalles[0] : $detalles,
+					),
+				),
+			);
+		} else {
+			$req = array(
+				'FeCAEARegInfReq' => array(
+					'FeCabReq' => array(
+						'CantReg' 	=> $data['CbteHasta'] - $data['CbteDesde'] + 1,
+						'PtoVta' 	=> $data['PtoVta'],
+						'CbteTipo' 	=> $data['CbteTipo'],
+					),
+					'FeDetReq' => array(
+						'FECAEADetRequest' => $this->FormatVoucherDetail($data),
+					),
+				),
+			);
+		}
+
+		$results = $this->ExecuteRequest('FECAEARegInformativo', $req);
 
 		if ($return_response === TRUE) {
 			return $results;
 		}
-		else{
-			return array(
-				'CAE' 		=> $results->FeDetResp->FECAEDetResponse->CAE,
-				'CAEFchVto' => $this->FormatDate($results->FeDetResp->FECAEDetResponse->CAEFchVto),
-			);
-		}
+
+		return $this->ParseCaeaInformativoResponse($results);
+	}
+
+	/**
+	 * Solicita un CAEA para periodo y quincena {@see WS Specification}
+	 *
+	 * @param int $periodo Formato yyyymm
+	 * @param int $orden   1 = primera quincena, 2 = segunda
+	 **/
+	public function RequestCaea($periodo, $orden)
+	{
+		return $this->ExecuteRequest('FECAEASolicitar', array(
+			'Periodo' => $periodo,
+			'Orden'   => $orden,
+		))->ResultGet;
+	}
+
+	/**
+	 * Consulta CAEA ya otorgado {@see WS Specification}
+	 **/
+	public function QueryCaea($periodo, $orden)
+	{
+		return $this->ExecuteRequest('FECAEAConsultar', array(
+			'Periodo' => $periodo,
+			'Orden'   => $orden,
+		))->ResultGet;
+	}
+
+	/**
+	 * Informa CAEA sin movimiento para un punto de venta
+	 **/
+	public function InformCaeaNoMovement($sales_point, $caea)
+	{
+		return $this->ExecuteRequest('FECAEASinMovimientoInformar', array(
+			'PtoVta' => $sales_point,
+			'CAEA'   => $caea,
+		));
+	}
+
+	/**
+	 * Consulta informes de CAEA sin movimiento
+	 **/
+	public function QueryCaeaNoMovement($caea, $sales_point)
+	{
+		return $this->ExecuteRequest('FECAEASinMovimientoConsultar', array(
+			'CAEA'   => $caea,
+			'PtoVta' => $sales_point,
+		))->ResultGet;
 	}
 
 	/**
@@ -138,7 +251,18 @@ class ElectronicBilling extends AfipWebService {
 		$data['CbteDesde'] = $voucher_number;
 		$data['CbteHasta'] = $voucher_number;
 		
-		$res                   = $this->CreateVoucher($data, $return_response);
+		$res = $this->CreateVoucher($data, $return_response);
+
+		if ($return_response === TRUE) {
+			if (is_object($res)) {
+				$res->voucher_number = $voucher_number;
+			} else {
+				$res['voucher_number'] = $voucher_number;
+			}
+
+			return $res;
+		}
+
 		$res['voucher_number'] = $voucher_number;
 
 		return $res;
@@ -284,6 +408,61 @@ class ElectronicBilling extends AfipWebService {
 	}
 
 	/**
+	 * Cotización de moneda (FEParamGetCotizacion)
+	 *
+	 * @param string      $currency_id  Código MonId (ej. DOL, PES)
+	 * @param string|null $quote_date   Fecha yyyymmdd; null = cotización del día
+	 **/
+	public function GetCurrencyQuotation($currency_id, $quote_date = NULL)
+	{
+		$params = array('MonId' => $currency_id);
+		if ($quote_date !== NULL) {
+			$params['FchCotiz'] = $quote_date;
+		}
+
+		return $this->ExecuteRequest('FEParamGetCotizacion', $params)->ResultGet;
+	}
+
+	/**
+	 * Condiciones de IVA del receptor válidas para emitir (RG 5616)
+	 *
+	 * @param string|null $voucher_class Clase de comprobante (Cmp_Clase), ej. A, B, C
+	 **/
+	public function GetReceiverVatConditions($voucher_class = NULL)
+	{
+		$params = array();
+		if ($voucher_class !== NULL) {
+			$params['ClaseCmp'] = $voucher_class;
+		}
+
+		return $this->ExecuteRequest('FEParamGetCondicionIvaReceptor', $params)->ResultGet->CondicionIvaReceptor;
+	}
+
+	/**
+	 * Países habilitados para el servicio
+	 **/
+	public function GetCountryTypes()
+	{
+		return $this->ExecuteRequest('FEParamGetTiposPaises')->ResultGet->PaisTipo;
+	}
+
+	/**
+	 * Actividades habilitadas para el emisor
+	 **/
+	public function GetActivityTypes()
+	{
+		return $this->ExecuteRequest('FEParamGetActividades')->ResultGet->ActividadesTipo;
+	}
+
+	/**
+	 * Cantidad máxima de registros por FECAESolicitar / FECAEARegInformativo
+	 **/
+	public function GetMaxRegistrationsPerRequest()
+	{
+		return $this->ExecuteRequest('FECompTotXRequest')->RegXReq;
+	}
+
+	/**
 	 * Asks to web service for servers status {@see WS 
 	 * Specification item 4.14}
 	 *
@@ -309,7 +488,12 @@ class ElectronicBilling extends AfipWebService {
 	**/
 	public function FormatDate($date)
 	{
-		return date_format(DateTime::CreateFromFormat('Ymd', $date.''), 'Y-m-d');
+		$parsed = DateTime::createFromFormat('Ymd', (string) $date);
+		if ($parsed === false) {
+			throw new Exception('Invalid AFIP date format: '.$date);
+		}
+
+		return $parsed->format('Y-m-d');
 	}
 
 	/**
@@ -375,16 +559,125 @@ class ElectronicBilling extends AfipWebService {
 	{
 		$res = $results->{$operation.'Result'};
 
-		if ($operation == 'FECAESolicitar') {
-			if (isset($res->FeDetResp->FECAEDetResponse->Observaciones) && $res->FeDetResp->FECAEDetResponse->Resultado != 'A') {
-				$res->Errors = new StdClass();
-				$res->Errors->Err = $res->FeDetResp->FECAEDetResponse->Observaciones->Obs;
-			}
+		if ($operation === 'FECAESolicitar') {
+			$this->MapVoucherObservationsToErrors($res, 'FECAEDetResponse');
+		}
+
+		if ($operation === 'FECAEARegInformativo') {
+			$this->MapVoucherObservationsToErrors($res, 'FECAEADetResponse');
 		}
 
 		if (isset($res->Errors)) {
 			$err = is_array($res->Errors->Err) ? $res->Errors->Err[0] : $res->Errors->Err;
 			throw new Exception('('.$err->Code.') '.$err->Msg, $err->Code);
+		}
+	}
+
+	/**
+	 * Normaliza arrays anidados del detalle de comprobante para SOAP
+	 **/
+	private function FormatVoucherDetail(array $data)
+	{
+		unset($data['CantReg'], $data['PtoVta'], $data['CbteTipo'], $data['comprobantes']);
+
+		if (isset($data['Tributos'])) {
+			$data['Tributos'] = array('Tributo' => $data['Tributos']);
+		}
+
+		if (isset($data['Iva'])) {
+			$data['Iva'] = array('AlicIva' => $data['Iva']);
+		}
+
+		if (isset($data['Opcionales'])) {
+			$data['Opcionales'] = array('Opcional' => $data['Opcionales']);
+		}
+
+		if (isset($data['CbtesAsoc'])) {
+			$data['CbtesAsoc'] = array('CbteAsoc' => $data['CbtesAsoc']);
+		}
+
+		if (isset($data['Compradores'])) {
+			$data['Compradores'] = array('Comprador' => $data['Compradores']);
+		}
+
+		if (isset($data['Actividades'])) {
+			$data['Actividades'] = array('Actividad' => $data['Actividades']);
+		}
+
+		return $data;
+	}
+
+	private function ParseCaeVoucherResponse($results, $return_response)
+	{
+		if ($return_response === TRUE) {
+			return $results;
+		}
+
+		$parsed = $this->MapCaeDetailResponses($results->FeDetResp->FECAEDetResponse);
+
+		return count($parsed) === 1 ? $parsed[0] : $parsed;
+	}
+
+	private function ParseCaeaInformativoResponse($results)
+	{
+		$det_responses = $results->FeDetResp->FECAEADetResponse;
+		if (!is_array($det_responses)) {
+			$det_responses = array($det_responses);
+		}
+
+		$parsed = array();
+		foreach ($det_responses as $det) {
+			$parsed[] = array(
+				'CAEA'       => isset($det->CAEA) ? $det->CAEA : NULL,
+				'CbteDesde'  => $det->CbteDesde,
+				'CbteHasta'  => $det->CbteHasta,
+				'Resultado'  => $det->Resultado,
+			);
+		}
+
+		return count($parsed) === 1 ? $parsed[0] : $parsed;
+	}
+
+	private function MapCaeDetailResponses($det_responses, $format_cae_expiration = TRUE)
+	{
+		if (!is_array($det_responses)) {
+			$det_responses = array($det_responses);
+		}
+
+		$parsed = array();
+		foreach ($det_responses as $det) {
+			$row = array(
+				'CAE'         => $det->CAE,
+				'CbteDesde'   => $det->CbteDesde,
+				'CbteHasta'   => $det->CbteHasta,
+				'Resultado'   => $det->Resultado,
+			);
+			if ($format_cae_expiration && isset($det->CAEFchVto)) {
+				$row['CAEFchVto'] = $this->FormatDate($det->CAEFchVto);
+			}
+			$parsed[] = $row;
+		}
+
+		return $parsed;
+	}
+
+	private function MapVoucherObservationsToErrors($res, $detail_key)
+	{
+		if (!isset($res->FeDetResp->{$detail_key})) {
+			return;
+		}
+
+		$details = $res->FeDetResp->{$detail_key};
+		if (!is_array($details)) {
+			$details = array($details);
+		}
+
+		foreach ($details as $det) {
+			if (isset($det->Observaciones) && isset($det->Resultado) && $det->Resultado !== 'A') {
+				$res->Errors = new StdClass();
+				$res->Errors->Err = $det->Observaciones->Obs;
+				return;
+			}
 		}
 	}
 

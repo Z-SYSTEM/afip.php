@@ -8,6 +8,7 @@ $data = array(
 	'Concepto' 		=> 1, // Concepto del Comprobante: (1)Productos, (2)Servicios, (3)Productos y Servicios
 	'DocTipo' 		=> 80, // Tipo de documento del comprador (ver tipos disponibles)
 	'DocNro' 		=> 20111111112, // Numero de documento del comprador
+	'CondicionIVAReceptorId' => 1, // Condicion IVA del receptor (obligatorio ARCA): 1=RI, 4=Exento, 5=Consumidor Final, 6=Monotributo, etc.
 	'CbteDesde' 	=> 1, // Numero de comprobante o numero del primer comprobante en caso de ser mas de uno
 	'CbteHasta' 	=> 1, // Numero de comprobante o numero del ultimo comprobante en caso de ser mas de uno
 	'CbteFch' 		=> intval(date('Ymd')), // (Opcional) Fecha del comprobante (yyyymmdd) o fecha actual si es nulo
